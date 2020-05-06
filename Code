@@ -1,6 +1,5 @@
 'This sub apply the levenberg-marquadt algorithm for nonlinear least squares regression, also could apply Weigthed least squares
 'This regression is adapted to three parameters but can also be adapted to a different number of parameters
-Sub Levmar(X, y, F, dfu, Jcost, initial_theta, weighted)
 'X is a vector with m examples, X can be a multidimensional vector but the problem has to be modified
 'y is the result vector of the same dimension as X
 'F is the function to be regressed, this is called as an User Defined Function, so you have to create a Function program and then put its name in F
@@ -14,13 +13,16 @@ Sub Levmar(X, y, F, dfu, Jcost, initial_theta, weighted)
 'The weights are calculated from the number of points that are in an interval in X, if X is a class-interval data
 'If you want to change the weights of each data, or if you now the weights then you have to create a matrix mxm and add it to w()
 
+
+Sub Levmar(X, y, F, dfu, Jcost, initial_theta, weighted)
+
 Application.ScreenUpdating = False
 Dim m As Integer, n As Integer
 m = UBound(X) - LBound(X) + 1 'Number of points
 n = UBound(initial_theta) - LBound(initial_theta) + 1 'Number of parameters
 num_iters = 100 'Number of maximum iterations
 Dim lambda As Double 'Regularization term
-Dim Weight As Boolean
+Dim Weight As Boolean 'If we want the weighted algorithm or the unweighted
 ReDim N_Interval(1 To m, 1 To 1) As Double 'Number of points of every interval in X
 ReDim theta(0 To n - 1) As Double
 ReDim dJ(1 To n) As Double
@@ -39,7 +41,7 @@ V = 2
 
 'This is the initial aproximation (As always if this is far away from the optimum then the algorithm will diverge)
 'Usually happens with the Power Function (is not a good algorithm for that function in particular)
-Nugget = ActiveWorkbook.Sheets("Variogram Model").Range("J3")
+Nugget = ActiveWorkbook.Sheets("Variogram Model").Range("J3") 'Can be changed of course
 'For this algorithm is just for 3 parameters, but you can modify to add more parameters, watch out for other changes!
 theta(0) = initial_theta(1)
 theta(1) = initial_theta(2)
