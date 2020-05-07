@@ -12,19 +12,17 @@
 'weighted is an option if you want to calculate the Weighted Non-linear least squares where the weights add more importance to some values of X and y than others, this is used if you don't have reliable data
 'The weights are calculated from the number of points that are in an interval in X, if X is a class-interval data
 'If you want to change the weights of each data, or if you now the weights then you have to create a matrix mxm and add it to w()
-
-
-Sub Levmar(X, y, F, dfu, Jcost, initial_theta, weighted)
-
+Function Levmar(X, y, F, dfu, Jcost, initial_theta, Optional ByVal chain_param As Integer = -999, Optional ByVal weighted As Boolean = False) As Double()
 Application.ScreenUpdating = False
 Dim m As Integer, n As Integer
 m = UBound(X) - LBound(X) + 1 'Number of points
-n = UBound(initial_theta) - LBound(initial_theta) + 1 'Number of parameters
+n = UBound(initial_theta)
+n_min = LBound(initial_theta)
 num_iters = 100 'Number of maximum iterations
 Dim lambda As Double 'Regularization term
-Dim Weight As Boolean 'If we want the weighted algorithm or the unweighted
+Dim Weight As Boolean
 ReDim N_Interval(1 To m, 1 To 1) As Double 'Number of points of every interval in X
-ReDim theta(0 To n - 1) As Double
+ReDim theta(LBound(initial_theta) To UBound(initial_theta)) As Double
 ReDim dJ(1 To n) As Double
 ReDim J_history(1 To num_iters) As Double
 ReDim df(1 To m, 1 To n) As Double
@@ -41,18 +39,11 @@ V = 2
 
 'This is the initial aproximation (As always if this is far away from the optimum then the algorithm will diverge)
 'Usually happens with the Power Function (is not a good algorithm for that function in particular)
-Nugget = ActiveWorkbook.Sheets("Variogram Model").Range("J3") 'Can be changed of course
-'For this algorithm is just for 3 parameters, but you can modify to add more parameters, watch out for other changes!
-theta(0) = initial_theta(1)
-theta(1) = initial_theta(2)
-theta(2) = initial_theta(3)
+Nugget = ActiveWorkbook.Sheets("Variogram Model").Range("J3")
 
-If Nugget = "True" Then '<-This part is important, you can chain a parameter and calculate the rest
-    n_min = 1
-Else
-    theta(0) = ActiveWorkbook.Sheets("Variogram Model").Range("J4") 'This is if you want to chained one of the parameters
-    n_min = 2 'You can chained various parameters but you have to modify the code
-End If
+
+'For this algorithm is just for 3 parameters, but you can modify to add more parameters, watch out for other changes!
+theta = initial_theta
 
 For i = 1 To m
     N_Interval(i, 1) = ActiveWorkbook.Sheets("Data").Cells(24 + i, 10) 'This is for the weighted least squares method, it can be turn off
@@ -62,7 +53,7 @@ For iters = 1 To num_iters
     For i = 1 To m
         dC(i, 1) = y(i) - Application.Run(F, theta, X(i)) 'Here we calculate the error of y-F(X)
         For k = n_min To n
-            df(i, k) = Application.Run(dfu, theta, X(i), k - 1) 'k-1 is the derivated parameter <- Here is the Jacobian
+            df(i, k) = Application.Run(dfu, theta, X(i), k) 'k is the derivated parameter <- Here is the Jacobian
         Next
         If Weight = True Then
             If X(i) = 0 Then
@@ -84,12 +75,7 @@ For iters = 1 To num_iters
     Next
     B = WorksheetFunction.MMult(df_transpose, dC) 'nx1 matrix
     'First and third condition
-    e1 = 0 '<- we find the 1-norm of B (I think)
-    For Each Item In B
-        If Abs(Item) > e1 Then
-        e1 = Abs(Item)
-        End If
-    Next
+    e1 = inf_norm(B) '<- we find the 1-norm of B (I think)
     e3 = magnitude(B) 'another type of error
     If e1 <= eps1 Or e3 ^ 2 <= eps3 Then
         Exit For
@@ -103,8 +89,10 @@ For iters = 1 To num_iters
     End If
     
     For k = n_min To n
-        theta(k - 1) = theta(k - 1) + dtheta(k, 1) '<-We replace the old parameters for the new parameters if the errors of the iteration is still greater than the error defined
-    Next
+        If chain_param <> 999 And k = chain_param Then GoTo Nextiteration
+        theta(k) = theta(k) + dtheta(k, 1) '<-We replace the old parameters for the new parameters if the errors of the iteration is still greater than the error defined
+Nextiteration:
+    Next k
     'We compute the general error of the objective function with parameters theta
     J_history(iters) = Application.Run(Jcost, X, y, theta, m)
     'Here comes the damped iteration, this make the iteration run more slower or faster
@@ -114,18 +102,13 @@ For iters = 1 To num_iters
         Else
             lambda = V * lambda
             For k = n_min To n
-                theta(k - 1) = theta(k - 1) - dtheta(k, 1)
+                If chain_param <> 999 And k = chain_param Then GoTo pasa
+                theta(k) = theta(k) - dtheta(k, 1)
+pasa:
             Next
         End If
     End If
 Next
-
-For kl = 1 To 3
-    Cells(kl + 18, 8) = theta(kl - 1)
-Next
-
-Range("M2") = J_history(iters - 1)
-Range("M3") = iters - 1
-MsgBox "Fin"
+Levmar = theta
 Application.ScreenUpdating = True
-End Sub
+End Function
